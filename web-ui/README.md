@@ -1,7 +1,6 @@
 # Domain Checker
 
-<img width="921" height="995" alt="image" src="https://github.com/user-attachments/assets/36111683-1c8a-4bf4-b108-948d75b12ea8" />
-
+<img width="910" height="1046" alt="image" src="https://github.com/user-attachments/assets/dbcabd25-08a9-4e2f-b564-d5626588ac9b" />
 
 Bulk WHOIS availability scanner with Web UI.
 
