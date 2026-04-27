@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Domain Checker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: rgba(255,255,255,0.04);
+    --border: rgba(255,255,255,0.10);
+    --border-hover: rgba(255,255,255,0.30);
+    --text: #e8e8e8;
+    --text-dim: #666;
+    --text-dimmer: #333;
+    --accent: #f0f0f0;
+    --danger: #ff4444;
+    --success: #44ff88;
+    --warning: #ffcc00;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    overflow-x: hidden;
+  }
+
+  /* ── NOISE LAYER ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.06'/%3E%3C/svg%3E");
+    background-size: 200px 200px;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.55;
+  }
+
+  /* ── AMBIENT GLOW ── */
+  .glow-orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(120px);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .glow-orb.a {
+    width: 600px; height: 600px;
+    top: -200px; left: -150px;
+    background: radial-gradient(circle, rgba(255,255,255,0.025) 0%, transparent 70%);
+    animation: drift-a 18s ease-in-out infinite alternate;
+  }
+  .glow-orb.b {
+    width: 400px; height: 400px;
+    bottom: -100px; right: -80px;
+    background: radial-gradient(circle, rgba(255,255,255,0.015) 0%, transparent 70%);
+    animation: drift-b 22s ease-in-out infinite alternate;
+  }
+  @keyframes drift-a { from { transform: translate(0,0) scale(1); } to { transform: translate(60px, 40px) scale(1.1); } }
+  @keyframes drift-b { from { transform: translate(0,0) scale(1); } to { transform: translate(-40px, -30px) scale(0.9); } }
+
+  /* ── SCAN LINE ── */
+  body::after {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+    animation: scanline 8s linear infinite;
+    pointer-events: none;
+    z-index: 9998;
+  }
+  @keyframes scanline { 0% { top: -2px; } 100% { top: 100vh; } }
+
+  /* ── LAYOUT ── */
+  .wrapper {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 24px;
+    gap: 0;
+    animation: fade-in 1.2s ease both;
+  }
+  @keyframes fade-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ── HEADER ── */
+  .header {
+    text-align: center;
+    margin-bottom: 64px;
+    animation: fade-in 1s 0.1s ease both;
+  }
+
+  .eyebrow {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+  .eyebrow::before, .eyebrow::after {
+    content: '';
+    width: 32px; height: 1px;
+    background: var(--text-dimmer);
+  }
+
+  h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(80px, 14vw, 160px);
+    line-height: 0.88;
+    letter-spacing: -0.01em;
+    color: var(--accent);
+    text-transform: uppercase;
+    transform: scaleY(1.06) skewX(-1.5deg);
+    transform-origin: center;
+    position: relative;
+    display: inline-block;
+    mix-blend-mode: normal;
+  }
+  h1::after {
+    content: attr(data-text);
+    position: absolute;
+    inset: 0;
+    color: transparent;
+    -webkit-text-stroke: 1px rgba(255,255,255,0.06);
+    transform: translate(3px, 3px);
+    pointer-events: none;
+  }
+
+  .subtitle {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.15em;
+    margin-top: 20px;
+    text-transform: uppercase;
+  }
+
+  /* ── CARD ── */
+  .card {
+    width: 100%;
+    max-width: 520px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    padding: 40px 40px 36px;
+    position: relative;
+    overflow: hidden;
+    animation: fade-in 1s 0.25s ease both;
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+  }
+
+  /* ── STEPS ── */
+  .steps {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .step {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 18px 20px;
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.018);
+    transition: border-color 0.3s, background 0.3s, filter 0.3s;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    animation: fade-in 1s ease both;
+  }
+  .step:nth-child(1) { animation-delay: 0.35s; }
+  .step:nth-child(2) { animation-delay: 0.45s; }
+  .step:nth-child(3) { animation-delay: 0.55s; }
+
+  .step::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, rgba(255,255,255,0.04), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .step:hover { border-color: var(--border-hover); background: rgba(255,255,255,0.045); filter: brightness(1.05); }
+  .step:hover::after { opacity: 1; }
+  .step:active { transform: scale(0.99); }
+
+  .step-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    color: var(--text-dimmer);
+    line-height: 1;
+    min-width: 28px;
+    transition: color 0.3s;
+  }
+  .step:hover .step-num { color: rgba(255,255,255,0.3); }
+
+  .step-body { flex: 1; }
+  .step-label {
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text);
+    font-weight: 700;
+    display: block;
+    margin-bottom: 3px;
+  }
+  .step-desc {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+  }
+
+  .step-icon {
+    font-size: 16px;
+    opacity: 0.5;
+    transition: opacity 0.3s, transform 0.3s;
+  }
+  .step:hover .step-icon { opacity: 0.9; transform: translateX(2px); }
+
+  /* file input hidden */
+  #fileInput { display: none; }
+
+  /* ── DIVIDER ── */
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 8px 0;
+    color: var(--text-dimmer);
+    font-size: 9px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+  }
+  .divider::before, .divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── STATUS ── */
+  .status-bar {
+    margin-top: 28px;
+    padding: 14px 18px;
+    border: 1px solid var(--border);
+    background: rgba(0,0,0,0.4);
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    color: var(--text-dim);
+    min-height: 46px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: border-color 0.4s;
+    position: relative;
+    overflow: hidden;
+  }
+  .status-bar.ok { border-color: rgba(68,255,136,0.4); color: var(--success); }
+  .status-bar.err { border-color: rgba(255,68,68,0.4); color: var(--danger); }
+  .status-bar.running { border-color: rgba(255,204,0,0.35); color: var(--warning); }
+
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+    animation: none;
+  }
+  .status-bar.running .status-dot { animation: pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.3; transform: scale(0.6); } }
+
+  /* progress shimmer */
+  .status-bar.running::after {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 60%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,204,0,0.04), transparent);
+    animation: shimmer 1.4s linear infinite;
+  }
+  @keyframes shimmer { to { left: 160%; } }
+
+  /* ── STATS ── */
+  .stats {
+    display: none;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-top: 16px;
+    animation: fade-in 0.5s ease both;
+  }
+  .stats.visible { display: grid; }
+  .stat {
+    padding: 12px 8px;
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.02);
+    text-align: center;
+  }
+  .stat-val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 26px;
+    line-height: 1;
+    display: block;
+  }
+  .stat-val.total   { color: var(--text); }
+  .stat-val.avail   { color: var(--success); }
+  .stat-val.taken   { color: var(--danger); }
+  .stat-val.errors  { color: var(--text-dim); }
+  .stat-key {
+    font-size: 8px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-dimmer);
+    margin-top: 4px;
+    display: block;
+  }
+
+  /* ── FOOTER ── */
+  .footer {
+    margin-top: 48px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    animation: fade-in 1s 0.65s ease both;
+  }
+
+  .gh-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-dimmer);
+    text-decoration: none;
+    padding: 10px 20px;
+    border: 1px solid var(--text-dimmer);
+    transition: color 0.3s, border-color 0.3s, filter 0.3s;
+  }
+  .gh-link:hover { color: var(--text); border-color: var(--text-dim); filter: brightness(1.3); }
+  .gh-link svg { opacity: 0.7; transition: opacity 0.3s; }
+  .gh-link:hover svg { opacity: 1; }
+
+  .footer-note {
+    font-size: 9px;
+    color: var(--text-dimmer);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
+  /* ── MOBILE ── */
+  @media (max-width: 600px) {
+    .card { padding: 28px 20px; }
+    h1 { font-size: 72px; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div class="glow-orb a"></div>
+<div class="glow-orb b"></div>
+
+<div class="wrapper">
+
+  <header class="header">
+    <p class="eyebrow">whois utility</p>
+    <h1 data-text="Domain Checker">Domain Checker</h1>
+    <p class="subtitle">Bulk WHOIS availability scanner</p>
+  </header>
+
+  <main class="card">
+    <input type="file" id="fileInput" accept=".csv" />
+
+    <div class="steps">
+
+      <div class="step" id="stepUpload" role="button" tabindex="0" aria-label="Upload CSV file">
+        <span class="step-num">01</span>
+        <div class="step-body">
+          <span class="step-label">Upload File</span>
+          <span class="step-desc" id="uploadDesc">Select your domains.csv</span>
+        </div>
+        <span class="step-icon">↑</span>
+      </div>
+
+      <div class="divider">then</div>
+
+      <div class="step" id="stepRun" role="button" tabindex="0" aria-label="Run domain check">
+        <span class="step-num">02</span>
+        <div class="step-body">
+          <span class="step-label">Run Check</span>
+          <span class="step-desc">Execute WHOIS lookups in parallel</span>
+        </div>
+        <span class="step-icon">▶</span>
+      </div>
+
+      <div class="divider">then</div>
+
+      <div class="step" id="stepDownload" role="button" tabindex="0" aria-label="Download results">
+        <span class="step-num">03</span>
+        <div class="step-body">
+          <span class="step-label">Download Results</span>
+          <span class="step-desc">Save results.csv to your machine</span>
+        </div>
+        <span class="step-icon">↓</span>
+      </div>
+
+    </div>
+
+    <div class="status-bar" id="statusBar">
+      <span class="status-dot"></span>
+      <span id="statusText">Ready. Upload a CSV to begin.</span>
+    </div>
+
+    <div class="stats" id="stats">
+      <div class="stat"><span class="stat-val total" id="sTotal">—</span><span class="stat-key">Total</span></div>
+      <div class="stat"><span class="stat-val avail" id="sAvail">—</span><span class="stat-key">Available</span></div>
+      <div class="stat"><span class="stat-val taken" id="sTaken">—</span><span class="stat-key">Taken</span></div>
+      <div class="stat"><span class="stat-val errors" id="sErr">—</span><span class="stat-key">Errors</span></div>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <a class="gh-link" href="https://github.com/it-stnkv/find-domain" target="_blank" rel="noopener">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+      </svg>
+      View on GitHub
+    </a>
+    <p class="footer-note">v1.0 · built with FastAPI + whois</p>
+  </footer>
+
+</div>
+
+<script>
+  const fileInput   = document.getElementById('fileInput');
+  const stepUpload  = document.getElementById('stepUpload');
+  const stepRun     = document.getElementById('stepRun');
+  const stepDl      = document.getElementById('stepDownload');
+  const statusBar   = document.getElementById('statusBar');
+  const statusText  = document.getElementById('statusText');
+  const uploadDesc  = document.getElementById('uploadDesc');
+  const statsEl     = document.getElementById('stats');
+
+  function setStatus(msg, type = '') {
+    statusBar.className = 'status-bar' + (type ? ' ' + type : '');
+    statusText.textContent = msg;
+  }
+
+  function setStats(data) {
+    document.getElementById('sTotal').textContent = data.total;
+    document.getElementById('sAvail').textContent = data.available;
+    document.getElementById('sTaken').textContent = data.taken;
+    document.getElementById('sErr').textContent   = data.errors;
+    statsEl.classList.add('visible');
+  }
+
+  // ── UPLOAD ──
+  stepUpload.addEventListener('click', () => fileInput.click());
+  stepUpload.addEventListener('keydown', e => e.key === 'Enter' && fileInput.click());
+
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+
+    setStatus(`Uploading ${file.name}…`, 'running');
+
+    const form = new FormData();
+    form.append('file', file);
+
+    try {
+      const res = await fetch('/upload', { method: 'POST', body: form });
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.detail || 'Upload failed');
+
+      uploadDesc.textContent = file.name;
+      setStatus(`✓ ${file.name} uploaded successfully`, 'ok');
+    } catch (err) {
+      setStatus(`✗ Upload error: ${err.message}`, 'err');
+    } finally {
+      fileInput.value = '';
+    }
+  });
+
+  // ── RUN ──
+  stepRun.addEventListener('click', runCheck);
+  stepRun.addEventListener('keydown', e => e.key === 'Enter' && runCheck());
+
+  async function runCheck() {
+    setStatus('Running WHOIS lookups… this may take a while.', 'running');
+    statsEl.classList.remove('visible');
+
+    try {
+      const res = await fetch('/run', { method: 'POST' });
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.detail || 'Run failed');
+
+      setStatus(
+        `✓ Done — ${data.total} domains checked (${data.available} available, ${data.taken} taken, ${data.errors} errors)`,
+        'ok'
+      );
+      setStats(data);
+    } catch (err) {
+      setStatus(`✗ Error: ${err.message}`, 'err');
+    }
+  }
+
+  // ── DOWNLOAD ──
+  stepDl.addEventListener('click', downloadResults);
+  stepDl.addEventListener('keydown', e => e.key === 'Enter' && downloadResults());
+
+  async function downloadResults() {
+    setStatus('Preparing download…', 'running');
+
+    try {
+      const res = await fetch('/download');
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.detail || 'Download failed');
+      }
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'results.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+
+      setStatus('✓ results.csv downloaded', 'ok');
+    } catch (err) {
+      setStatus(`✗ ${err.message}`, 'err');
+    }
+  }
+</script>
+</body>
+</html>
